@@ -20,67 +20,42 @@ Certainly! Here's a simplified version of the Jenkins pipeline script for the fi
 ```groovy
 pipeline {
     agent any
+
     environment {
-        AWS_ROLE_ARN = 'arn:aws:iam::123456789012:role/my-role'
-        AWS_ROLE_SESSION_NAME = 'my-session'
-        DURATION_SECONDS = 3600
-        PROFILE_NAME = 'my-profile'
+        ROLE_ARN = "arn:aws:iam::123456789012:role/YourRoleName"
+        SESSION_NAME = "YourSessionName"
+        AWS_PROFILE = "your-aws-profile"  // Replace with your AWS profile name
     }
+
     stages {
-        stage('Refresh AWS Credentials') {
+        stage('Assume Role and Update Credentials') {
             steps {
                 script {
-                    // Assume AWS role and capture credentials
-                    sh """
-                        aws sts assume-role \
-                            --role-arn ${AWS_ROLE_ARN} \
-                            --role-session-name ${AWS_ROLE_SESSION_NAME} \
-                            --duration-seconds ${DURATION_SECONDS} \
-                            > ~/.aws/temp_credentials
-                    """
-                    
-                    // Read assumed credentials from file
-                    def credentialsFile = readFile("${env.HOME}/.aws/temp_credentials").trim()
-                    
-                    // Update AWS credentials file with the new profile
-                    sh """
-                        awk -v profile="${PROFILE_NAME}" '
-                            BEGIN { profileFound = 0 }
-                            { 
-                                if (\$0 ~ "^\\[" profile "\\]") {
-                                    profileFound = 1
-                                    print "[" profile "]"
-                                    print "aws_access_key_id=" access_key
-                                    print "aws_secret_access_key=" secret_key
-                                    print "aws_session_token=" session_token
-                                } else {
-                                    print \$0
-                                }
-                            }
-                            END { 
-                                if (profileFound == 0) {
-                                    print "[" profile "]"
-                                    print "aws_access_key_id=" access_key
-                                    print "aws_secret_access_key=" secret_key
-                                    print "aws_session_token=" session_token
-                                }
-                            }
-                        ' access_key="${credentials.AccessKeyId}" \
-                          secret_key="${credentials.SecretAccessKey}" \
-                          session_token="${credentials.SessionToken}" \
-                          ~/.aws/credentials > ~/.aws/credentials_updated
-                    """
-                    
-                    // Print updated AWS credentials file
-                    sh 'cat ~/.aws/credentials_updated'
-                    
-                    // Clean up temporary credentials file
-                    sh 'rm ~/.aws/temp_credentials'
+                    def assumeRoleAndRefreshCredentials = {
+                        def command = "aws sts assume-role --role-arn ${ROLE_ARN} --role-session-name ${SESSION_NAME} --profile ${AWS_PROFILE}"
+                        def result = sh(script: command, returnStdout: true).trim()
+                        def jsonSlurper = new groovy.json.JsonSlurper()
+                        def credentials = jsonSlurper.parseText(result).Credentials
+
+                        def accessKeyId = credentials.AccessKeyId
+                        def secretAccessKey = credentials.SecretAccessKey
+                        def sessionToken = credentials.SessionToken
+
+                        // Update AWS CLI config with new credentials for the specific profile
+                        sh "aws configure set aws_access_key_id ${accessKeyId} --profile ${AWS_PROFILE}"
+                        sh "aws configure set aws_secret_access_key ${secretAccessKey} --profile ${AWS_PROFILE}"
+                        sh "aws configure set aws_session_token ${sessionToken} --profile ${AWS_PROFILE}"
+
+                        echo "Successfully assumed role and updated credentials for profile ${AWS_PROFILE}"
+                    }
+
+                    assumeRoleAndRefreshCredentials()
                 }
             }
         }
     }
 }
+
 ```
 
 ### Explanation:
