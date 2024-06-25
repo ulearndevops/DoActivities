@@ -13,6 +13,10 @@ Here’s a revised version of the first script that addresses these concerns:
 
 #### Jenkinsfile (First Job):
 
+Certainly! Here's a simplified version of the Jenkins pipeline script for the first job, focusing on using `sh` to assume the AWS role, update the credentials file, and print its contents:
+
+### Simplified First Job: Credential Refresh Job
+
 ```groovy
 pipeline {
     agent any
@@ -26,60 +30,68 @@ pipeline {
         stage('Refresh AWS Credentials') {
             steps {
                 script {
-                    // Use a shell script to assume the role and capture the credentials in a file
+                    // Assume AWS role and capture credentials
                     sh """
                         aws sts assume-role \
                             --role-arn ${AWS_ROLE_ARN} \
                             --role-session-name ${AWS_ROLE_SESSION_NAME} \
                             --duration-seconds ${DURATION_SECONDS} \
-                            > assume-role-output.json
+                            > ~/.aws/temp_credentials
                     """
                     
-                    // Read the assumed role output from the file
-                    def assumeRoleResult = readFile('assume-role-output.json').trim()
-                    def credentials = parseAWSCredentials(assumeRoleResult)
+                    // Read assumed credentials from file
+                    def credentialsFile = readFile("${env.HOME}/.aws/temp_credentials").trim()
                     
-                    // Update the AWS credentials file with the new profile
-                    updateAWSCredentialsFile(env.PROFILE_NAME, credentials)
+                    // Update AWS credentials file with the new profile
+                    sh """
+                        awk -v profile="${PROFILE_NAME}" '
+                            BEGIN { profileFound = 0 }
+                            { 
+                                if (\$0 ~ "^\\[" profile "\\]") {
+                                    profileFound = 1
+                                    print "[" profile "]"
+                                    print "aws_access_key_id=" access_key
+                                    print "aws_secret_access_key=" secret_key
+                                    print "aws_session_token=" session_token
+                                } else {
+                                    print \$0
+                                }
+                            }
+                            END { 
+                                if (profileFound == 0) {
+                                    print "[" profile "]"
+                                    print "aws_access_key_id=" access_key
+                                    print "aws_secret_access_key=" secret_key
+                                    print "aws_session_token=" session_token
+                                }
+                            }
+                        ' access_key="${credentials.AccessKeyId}" \
+                          secret_key="${credentials.SecretAccessKey}" \
+                          session_token="${credentials.SessionToken}" \
+                          ~/.aws/credentials > ~/.aws/credentials_updated
+                    """
                     
-                    // Print the updated AWS credentials file
-                    printAWSCredentialsFile()
+                    // Print updated AWS credentials file
+                    sh 'cat ~/.aws/credentials_updated'
+                    
+                    // Clean up temporary credentials file
+                    sh 'rm ~/.aws/temp_credentials'
                 }
             }
         }
     }
 }
-
-def parseAWSCredentials(assumeRoleResult) {
-    def jsonSlurper = new groovy.json.JsonSlurper()
-    def credentials = jsonSlurper.parseText(assumeRoleResult)
-    return credentials.Credentials
-}
-
-def updateAWSCredentialsFile(profileName, credentials) {
-    def credentialsFile = readFile("${env.HOME}/.aws/credentials")
-    def profileRegex = "(?s)\\[${profileName}\\].*?(?=\\[|\\z)"
-    def newProfileContent = """
-        [${profileName}]
-        aws_access_key_id=${credentials.AccessKeyId}
-        aws_secret_access_key=${credentials.SecretAccessKey}
-        aws_session_token=${credentials.SessionToken}
-    """
-
-    if (credentialsFile =~ profileRegex) {
-        credentialsFile = credentialsFile.replaceAll(profileRegex, newProfileContent)
-    } else {
-        credentialsFile += "\n" + newProfileContent
-    }
-
-    writeFile file: "${env.HOME}/.aws/credentials", text: credentialsFile
-}
-
-def printAWSCredentialsFile() {
-    sh 'cat ~/.aws/credentials'
-}
 ```
 
+### Explanation:
+
+- **Assume AWS Role:** Uses `aws sts assume-role` command to assume the specified AWS role and redirects the output to `~/.aws/temp_credentials`.
+- **Update AWS Credentials File:** Uses `awk` within `sh` to update the `~/.aws/credentials` file:
+  - Checks if the profile (`[PROFILE_NAME]`) already exists. If it does, updates it with new credentials; if not, appends a new profile with the credentials.
+- **Print Updated Credentials:** Prints the contents of the updated `~/.aws/credentials` file to the Jenkins job console.
+- **Clean Up:** Removes the temporary credentials file (`~/.aws/temp_credentials`) used to store the assumed role output.
+
+This script utilizes shell commands (`sh`) to handle all operations, avoiding complex Groovy functions and ensuring compatibility with Jenkins CPS (Continuation Passing Style). Adjust paths and AWS CLI commands as per your environment and requirements.
 ### Explanation:
 
 1. **Shell Command to Assume Role:** The `sh` step is used to assume the AWS role and save the credentials output to a file (`assume-role-output.json`). This avoids using non-serializable objects directly in the script.
