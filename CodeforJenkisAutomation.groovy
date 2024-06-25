@@ -4,6 +4,15 @@ To ensure that updating the `~/.aws/credentials` file does not affect other prof
 
 #### Jenkinsfile (First Job):
 
+```
+The exception you're encountering (`com.cloudbees.groovy.cps.impl.BlockScopeEnv.locals`) is typically due to trying to use non-serializable objects within the CPS (Continuation Passing Style) transformation that Jenkins pipelines use. To avoid this, we need to ensure all Groovy objects and methods used in the pipeline script are compatible with Jenkins' CPS.
+
+Here’s a revised version of the first script that addresses these concerns:
+
+### First Job: Credential Refresh Job
+
+#### Jenkinsfile (First Job):
+
 ```groovy
 pipeline {
     agent any
@@ -17,24 +26,33 @@ pipeline {
         stage('Refresh AWS Credentials') {
             steps {
                 script {
-                    def credentials = getAWSCredentials(env.AWS_ROLE_ARN, env.AWS_ROLE_SESSION_NAME, env.DURATION_SECONDS)
+                    // Use a shell script to assume the role and capture the credentials in a file
+                    sh """
+                        aws sts assume-role \
+                            --role-arn ${AWS_ROLE_ARN} \
+                            --role-session-name ${AWS_ROLE_SESSION_NAME} \
+                            --duration-seconds ${DURATION_SECONDS} \
+                            > assume-role-output.json
+                    """
+                    
+                    // Read the assumed role output from the file
+                    def assumeRoleResult = readFile('assume-role-output.json').trim()
+                    def credentials = parseAWSCredentials(assumeRoleResult)
+                    
+                    // Update the AWS credentials file with the new profile
                     updateAWSCredentialsFile(env.PROFILE_NAME, credentials)
+                    
+                    // Print the updated AWS credentials file
+                    printAWSCredentialsFile()
                 }
             }
         }
     }
 }
 
-def getAWSCredentials(roleArn, roleSessionName, durationSeconds) {
-    def assumeRoleCmd = """
-        aws sts assume-role \
-            --role-arn ${roleArn} \
-            --role-session-name ${roleSessionName} \
-            --duration-seconds ${durationSeconds}
-    """
-    def assumeRoleResult = sh(script: assumeRoleCmd, returnStdout: true).trim()
-    def credentials = readJSON text: assumeRoleResult
-
+def parseAWSCredentials(assumeRoleResult) {
+    def jsonSlurper = new groovy.json.JsonSlurper()
+    def credentials = jsonSlurper.parseText(assumeRoleResult)
     return credentials.Credentials
 }
 
@@ -56,6 +74,20 @@ def updateAWSCredentialsFile(profileName, credentials) {
 
     writeFile file: "${env.HOME}/.aws/credentials", text: credentialsFile
 }
+
+def printAWSCredentialsFile() {
+    sh 'cat ~/.aws/credentials'
+}
+```
+
+### Explanation:
+
+1. **Shell Command to Assume Role:** The `sh` step is used to assume the AWS role and save the credentials output to a file (`assume-role-output.json`). This avoids using non-serializable objects directly in the script.
+2. **Read and Parse Credentials:** The output from the file is read and parsed using Groovy's `JsonSlurper`.
+3. **Update AWS Credentials File:** The AWS credentials file is updated with the new profile, ensuring other profiles are not affected.
+4. **Print AWS Credentials File:** The contents of the updated credentials file are printed to the console.
+
+This approach ensures compatibility with Jenkins CPS and should avoid the `BlockScopeEnv.locals` exception.
 ```
 
 ### Second Job: Job Using Refreshed Credentials
