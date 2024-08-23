@@ -1,3 +1,24 @@
+Here’s the revised draft:
+
+---
+
+**Subject:** Confirmation Needed: Proceeding with Azure for Migration
+
+Hi Team,
+
+@Jon – Can you please confirm if we can proceed with the deployment on Azure, or do you have any specific requirements that this deployment should go for AWS?
+
+@Lel – If it’s okay to go with Azure, we already have a dedicated subnet in the Baxter Azure account with a /24 CIDR range limited to 256 IPs. Would you approve using that and establishing VPN connectivity with the Baxter Azure account?
+
+Looking forward to your feedback.
+
+Best regards,  
+[Your Name]
+
+---
+
+This version includes the AWS option while still focusing on Azure as requested.
+
 
 Here’s a draft for your email to the security team:
 
