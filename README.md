@@ -1,28 +1,33 @@
-1. Install AWS CLI Version 2
-AWS CLI Version 2 is the latest major version with enhanced features. Here’s how to install it:
-
-Download the AWS CLI Version 2 installer:
+ethod 2: Building Python 3.9 from Source
+Install Prerequisites:
 
 bash
 Copy code
-curl "https://d1uj6qtbmh3dt5.cloudfront.net/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-For ARM-based systems, use:
+sudo yum groupinstall "Development Tools" -y
+sudo yum install openssl-devel bzip2-devel libffi-devel -y
+Download Python 3.9 Source:
+
+Navigate to the Python official website to get the latest source code URL or use the command below for Python 3.9.13 (replace with the latest version as needed):
 
 bash
 Copy code
-curl "https://d1uj6qtbmh3dt5.cloudfront.net/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
-Unzip the installer:
+wget https://www.python.org/ftp/python/3.9.13/Python-3.9.13.tgz
+Extract the Source Code:
 
 bash
 Copy code
-unzip awscliv2.zip
-Run the installer:
+tar xzf Python-3.9.13.tgz
+Build and Install Python:
 
 bash
 Copy code
-sudo ./aws/install
-Verify the installation:
+cd Python-3.9.13
+./configure --enable-optimizations
+make
+sudo make altinstall
+altinstall prevents overwriting the default python binary.
+Verify the Installation:
 
 bash
 Copy code
-aws --version
+python3.9 --version
