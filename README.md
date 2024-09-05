@@ -1,3 +1,8 @@
+Here's a Terraform script to create a VM using an existing Ubuntu image from the Azure Compute Gallery (shared across resource groups), while deploying the VM into an existing resource group, VNet, and subnet. This script assumes you already have all these resources and just want to reference them without creating new ones.
+
+Terraform Script
+hcl
+Copy code
 provider "azurerm" {
   features {}
 }
@@ -120,3 +125,11 @@ resource "azurerm_network_interface" "example_nic" {
     private_ip_address_allocation = "Dynamic"
   }
 }
+Explanation:
+Existing Resources: The script uses data blocks to reference the existing resource group, VNet, subnet, and shared image.
+Shared Image Gallery: The azurerm_shared_image data block is used to fetch the Ubuntu image from the Azure Compute Gallery in another resource group.
+VM Deployment: The azurerm_linux_virtual_machine resource block deploys the VM into the existing resources, with the specified VM size, admin username, and password.
+Network Interface: A network interface is created and connected to the specified subnet, with a dynamic private IP for internal access.
+Variables:
+Replace the placeholder values with actual values for resource group names, image names, versions, VNet, subnet, etc.
+Let me know if you need further customization.
