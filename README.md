@@ -1,8 +1,3 @@
-Here's a Terraform script to create a VM using an existing Ubuntu image from the Azure Compute Gallery (shared across resource groups), while deploying the VM into an existing resource group, VNet, and subnet. This script assumes you already have all these resources and just want to reference them without creating new ones.
-
-Terraform Script
-hcl
-Copy code
 provider "azurerm" {
   features {}
 }
@@ -62,9 +57,10 @@ variable "admin_username" {
 variable "admin_password" {
   description = "Admin password for the VM"
   type        = string
+  sensitive   = true
 }
 
-# Data sources to get existing resources
+# Data source to get existing resources
 data "azurerm_resource_group" "vm_rg" {
   name = var.resource_group_name
 }
@@ -88,7 +84,20 @@ data "azurerm_shared_image" "ubuntu_image" {
   version             = var.image_version
 }
 
-# Creating the virtual machine
+# Network Interface for the VM
+resource "azurerm_network_interface" "example_nic" {
+  name                = "${var.vm_name}-nic"
+  location            = data.azurerm_resource_group.vm_rg.location
+  resource_group_name = data.azurerm_resource_group.vm_rg.name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = data.azurerm_subnet.subnet.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+
+# Creating the Virtual Machine
 resource "azurerm_linux_virtual_machine" "example_vm" {
   name                = var.vm_name
   resource_group_name = data.azurerm_resource_group.vm_rg.name
@@ -111,25 +120,19 @@ resource "azurerm_linux_virtual_machine" "example_vm" {
   identity {
     type = "SystemAssigned"
   }
-}
 
-# Network interface for the VM
-resource "azurerm_network_interface" "example_nic" {
-  name                = "${var.vm_name}-nic"
-  location            = data.azurerm_resource_group.vm_rg.location
-  resource_group_name = data.azurerm_resource_group.vm_rg.name
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = file("~/.ssh/id_rsa.pub")
+  }
 
-  ip_configuration {
-    name                          = "internal"
-    subnet_id                     = data.azurerm_subnet.subnet.id
-    private_ip_address_allocation = "Dynamic"
+  tags = {
+    environment = "internal"
   }
 }
-Explanation:
-Existing Resources: The script uses data blocks to reference the existing resource group, VNet, subnet, and shared image.
-Shared Image Gallery: The azurerm_shared_image data block is used to fetch the Ubuntu image from the Azure Compute Gallery in another resource group.
-VM Deployment: The azurerm_linux_virtual_machine resource block deploys the VM into the existing resources, with the specified VM size, admin username, and password.
-Network Interface: A network interface is created and connected to the specified subnet, with a dynamic private IP for internal access.
-Variables:
-Replace the placeholder values with actual values for resource group names, image names, versions, VNet, subnet, etc.
-Let me know if you need further customization.
+
+# Output the private IP address
+output "private_ip" {
+  description = "The private IP address of the virtual machine"
+  value       = azurerm_network_interface.example_nic.private_ip_address
+}
