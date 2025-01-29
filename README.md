@@ -1,6 +1,1 @@
-echo "Contents of ${envFile}:"
-  cat "${envFile}" | while read line; do
-      if [ ! -z "\${line}" ] && [ "\${line:0:1}" != "#" ]; then
-          echo "\${line}"
-      fi
-  done
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/local/bin/python3.9 2
