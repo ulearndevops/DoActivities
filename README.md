@@ -1,97 +1,92 @@
-To use the same IAM role for ALB Ingress with another EKS cluster, you can follow these steps to associate the existing IAM role with the new cluster's ALB Ingress Controller using IAM Roles for Service Accounts (IRSA):
+bGot it! You need a PowerShell script that finds a particular tag (Settings) at any depth within the XML and updates only its subchild elements while preserving other parts of the XML.
 
-1. Ensure IAM Role Trust Policy Allows the New EKS Cluster
 
-The IAM role must trust the OIDC provider of the new EKS cluster.
+---
 
-Get the OIDC provider URL for the new cluster:
+PowerShell Script:
 
-aws eks describe-cluster --name <new-cluster-name> --query "cluster.identity.oidc.issuer" --output text
+# Define the XML file path
+$xmlFile = "C:\path\to\config.xml"
 
-Check existing trust relationship of the IAM role:
+# Load the XML
+[xml]$xml = Get-Content $xmlFile
 
-aws iam get-role --role-name <existing-iam-role-name> --query 'Role.AssumeRolePolicyDocument'
+# Find all occurrences of the specific tag at any depth
+$targetNodes = $xml.SelectNodes("//Settings")
 
-If the new OIDC provider isn’t included, update the trust policy:
-
-{
-  "Effect": "Allow",
-  "Principal": {
-    "Federated": "arn:aws:iam::<account-id>:oidc-provider/<new-cluster-oidc-provider>"
-  },
-  "Action": "sts:AssumeRoleWithWebIdentity",
-  "Condition": {
-    "StringEquals": {
-      "<new-cluster-oidc-provider>:sub": "system:serviceaccount:<namespace>:<service-account-name>"
+if ($targetNodes.Count -gt 0) {
+    foreach ($node in $targetNodes) {
+        # Modify only the subchild elements inside each <Settings> tag
+        foreach ($child in $node.ChildNodes) {
+            $child.InnerText = "Updated_" + $child.Name  # Modify the value
+        }
     }
-  }
+
+    # Save the modified XML back
+    $xml.Save($xmlFile)
+    Write-Output "XML updated successfully."
+} else {
+    Write-Output "No <Settings> tag found."
 }
 
-Update the trust policy:
 
-aws iam update-assume-role-policy --role-name <existing-iam-role-name> --policy-document file://trust-policy.json
+---
 
+Example Input (config.xml):
+
+<Root>
+    <ModuleA>
+        <Config>
+            <Settings>
+                <Option1>Value1</Option1>
+                <Option2>Value2</Option2>
+            </Settings>
+        </Config>
+    </ModuleA>
+    <ModuleB>
+        <Settings>
+            <OptionA>ValueA</OptionA>
+            <OptionB>ValueB</OptionB>
+        </Settings>
+    </ModuleB>
+</Root>
+
+Output after script execution (config.xml):
+
+<Root>
+    <ModuleA>
+        <Config>
+            <Settings>
+                <Option1>Updated_Option1</Option1>
+                <Option2>Updated_Option2</Option2>
+            </Settings>
+        </Config>
+    </ModuleA>
+    <ModuleB>
+        <Settings>
+            <OptionA>Updated_OptionA</OptionA>
+            <OptionB>Updated_OptionB</OptionB>
+        </Settings>
+    </ModuleB>
+</Root>
 
 
 ---
 
-2. Create the Service Account in the New Cluster
+How It Works:
 
-Create a Kubernetes service account for the ALB Ingress Controller in the new cluster, referencing the existing IAM role.
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: alb-ingress-controller
-  namespace: kube-system
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<existing-iam-role-name>
-
-Apply it:
-
-kubectl apply -f alb-ingress-serviceaccount.yaml
+1. The script searches for all <Settings> tags, no matter how deeply nested they are.
 
 
----
-
-3. Deploy the ALB Ingress Controller
-
-When deploying the ALB Ingress Controller in the new EKS cluster, specify the service account:
-
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-
-helm install alb-ingress-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName=<new-cluster-name> \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=alb-ingress-controller \
-  --set region=<aws-region> \
-  --set vpcId=<vpc-id>
+2. It loops through each <Settings> node and updates only its direct subchild elements.
 
 
----
-
-4. Verify the ALB Ingress Controller
-
-Check if the ALB Ingress Controller is using the correct IAM role:
-
-kubectl -n kube-system get pods -l app.kubernetes.io/name=aws-load-balancer-controller
-kubectl -n kube-system logs <alb-ingress-pod-name>
-
-In the logs, verify the IAM role is attached and the controller is functioning correctly.
+3. The rest of the XML structure remains unchanged.
 
 
----
-
-✅ Key Considerations:
-
-The trust policy should allow both clusters’ OIDC providers if they differ.
-
-Ensure the IAM role has all necessary policies (elasticloadbalancing:, ec2:, etc.) attached.
-
-The namespace and service account name in the trust policy must match the new cluster.
+4. The modified XML is saved back to the file.
 
 
-This approach lets you reuse the same IAM role across multiple EKS clusters without creating new roles.
+
+Let me know if you need further refinements!
 
