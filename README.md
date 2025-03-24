@@ -1,30 +1,38 @@
-bGot it! You need a PowerShell script that finds a particular tag (Settings) at any depth within the XML and updates only its subchild elements while preserving other parts of the XML.
+ Understood! If you provide only the <Settings> part as input (instead of the entire XML file), the script will process and update only the subchild elements of <Settings>, keeping the rest untouched.
 
 
 ---
 
 PowerShell Script:
 
-# Define the XML file path
-$xmlFile = "C:\path\to\config.xml"
+# Input: Raw <Settings> XML content
+$settingsXml = @"
+<Settings>
+    <Option1>OldValue1</Option1>
+    <Option2>OldValue2</Option2>
+    <IgnoreThis>DoNotChange</IgnoreThis>
+</Settings>
+"@
 
-# Load the XML
-[xml]$xml = Get-Content $xmlFile
+# Load the XML fragment
+[xml]$xml = $settingsXml
 
-# Find all occurrences of the specific tag at any depth
-$targetNodes = $xml.SelectNodes("//Settings")
+# List of subchild tags that need to be updated
+$tagsToUpdate = @("Option1", "Option2")  # Modify this list as needed
 
-if ($targetNodes.Count -gt 0) {
-    foreach ($node in $targetNodes) {
-        # Modify only the subchild elements inside each <Settings> tag
-        foreach ($child in $node.ChildNodes) {
+# Find the <Settings> node
+$settingsNode = $xml.SelectSingleNode("Settings")
+
+if ($settingsNode -ne $null) {
+    foreach ($child in $settingsNode.ChildNodes) {
+        # Update only the specified subchild elements
+        if ($tagsToUpdate -contains $child.Name) {
             $child.InnerText = "Updated_" + $child.Name  # Modify the value
         }
     }
 
-    # Save the modified XML back
-    $xml.Save($xmlFile)
-    Write-Output "XML updated successfully."
+    # Output the modified <Settings> XML
+    $xml.OuterXml
 } else {
     Write-Output "No <Settings> tag found."
 }
@@ -32,61 +40,39 @@ if ($targetNodes.Count -gt 0) {
 
 ---
 
-Example Input (config.xml):
+Example Input:
 
-<Root>
-    <ModuleA>
-        <Config>
-            <Settings>
-                <Option1>Value1</Option1>
-                <Option2>Value2</Option2>
-            </Settings>
-        </Config>
-    </ModuleA>
-    <ModuleB>
-        <Settings>
-            <OptionA>ValueA</OptionA>
-            <OptionB>ValueB</OptionB>
-        </Settings>
-    </ModuleB>
-</Root>
+<Settings>
+    <Option1>OldValue1</Option1>
+    <Option2>OldValue2</Option2>
+    <IgnoreThis>DoNotChange</IgnoreThis>
+</Settings>
 
-Output after script execution (config.xml):
+Output after script execution:
 
-<Root>
-    <ModuleA>
-        <Config>
-            <Settings>
-                <Option1>Updated_Option1</Option1>
-                <Option2>Updated_Option2</Option2>
-            </Settings>
-        </Config>
-    </ModuleA>
-    <ModuleB>
-        <Settings>
-            <OptionA>Updated_OptionA</OptionA>
-            <OptionB>Updated_OptionB</OptionB>
-        </Settings>
-    </ModuleB>
-</Root>
+<Settings>
+    <Option1>Updated_Option1</Option1>
+    <Option2>Updated_Option2</Option2>
+    <IgnoreThis>DoNotChange</IgnoreThis>
+</Settings>
 
 
 ---
 
 How It Works:
 
-1. The script searches for all <Settings> tags, no matter how deeply nested they are.
+1. Takes the <Settings> XML as input.
 
 
-2. It loops through each <Settings> node and updates only its direct subchild elements.
+2. Parses it and finds only the subchild elements inside <Settings>.
 
 
-3. The rest of the XML structure remains unchanged.
+3. Updates only the specified tags (Option1, Option2 in this example).
 
 
-4. The modified XML is saved back to the file.
+4. Outputs the modified XML while keeping other subchild elements untouched.
 
 
 
-Let me know if you need further refinements!
+Let me know if you need any modifications!
 
