@@ -1,38 +1,45 @@
- Understood! If you provide only the <Settings> part as input (instead of the entire XML file), the script will process and update only the subchild elements of <Settings>, keeping the rest untouched.
+ Got it! You will provide the new <Settings> content, and the script should find all <Settings> tags inside the XML file and replace their inner content while keeping everything else unchanged.
 
 
 ---
 
 PowerShell Script:
 
-# Input: Raw <Settings> XML content
-$settingsXml = @"
+# Define the XML file path
+$xmlFile = "C:\path\to\config.xml"
+
+# Define the new <Settings> content (Replace this as per your input)
+$newSettingsContent = @"
 <Settings>
-    <Option1>OldValue1</Option1>
-    <Option2>OldValue2</Option2>
-    <IgnoreThis>DoNotChange</IgnoreThis>
+    <Option1>NewValue1</Option1>
+    <Option2>NewValue2</Option2>
 </Settings>
 "@
 
-# Load the XML fragment
-[xml]$xml = $settingsXml
+# Load the XML
+[xml]$xml = Get-Content $xmlFile
 
-# List of subchild tags that need to be updated
-$tagsToUpdate = @("Option1", "Option2")  # Modify this list as needed
+# Convert the new <Settings> content to an XML object
+[xml]$newSettingsXml = $newSettingsContent
 
-# Find the <Settings> node
-$settingsNode = $xml.SelectSingleNode("Settings")
+# Find all <Settings> nodes in the XML file
+$targetNodes = $xml.SelectNodes("//Settings")
 
-if ($settingsNode -ne $null) {
-    foreach ($child in $settingsNode.ChildNodes) {
-        # Update only the specified subchild elements
-        if ($tagsToUpdate -contains $child.Name) {
-            $child.InnerText = "Updated_" + $child.Name  # Modify the value
+if ($targetNodes.Count -gt 0) {
+    foreach ($node in $targetNodes) {
+        # Remove existing child nodes inside <Settings>
+        $node.RemoveAll()
+        
+        # Add new subchild nodes from the input
+        foreach ($newChild in $newSettingsXml.Settings.ChildNodes) {
+            $importedNode = $xml.ImportNode($newChild, $true)
+            $node.AppendChild($importedNode) | Out-Null
         }
     }
 
-    # Output the modified <Settings> XML
-    $xml.OuterXml
+    # Save the modified XML back to the file
+    $xml.Save($xmlFile)
+    Write-Output "XML updated successfully."
 } else {
     Write-Output "No <Settings> tag found."
 }
@@ -40,39 +47,62 @@ if ($settingsNode -ne $null) {
 
 ---
 
-Example Input:
+Example Input (config.xml before execution):
+
+<Root>
+    <ModuleA>
+        <Config>
+            <Settings>
+                <Option1>OldValue1</Option1>
+                <Option2>OldValue2</Option2>
+                <IgnoreThis>DoNotChange</IgnoreThis>
+            </Settings>
+        </Config>
+    </ModuleA>
+    <ModuleB>
+        <Settings>
+            <OptionA>OldValueA</OptionA>
+            <OptionB>OldValueB</OptionB>
+        </Settings>
+    </ModuleB>
+</Root>
+
+New Input for <Settings>:
 
 <Settings>
-    <Option1>OldValue1</Option1>
-    <Option2>OldValue2</Option2>
-    <IgnoreThis>DoNotChange</IgnoreThis>
+    <Option1>NewValue1</Option1>
+    <Option2>NewValue2</Option2>
 </Settings>
 
-Output after script execution:
 
-<Settings>
-    <Option1>Updated_Option1</Option1>
-    <Option2>Updated_Option2</Option2>
-    <IgnoreThis>DoNotChange</IgnoreThis>
-</Settings>
+---
+
+Output after script execution (config.xml after execution):
+
+<Root>
+    <ModuleA>
+        <Config>
+            <Settings>
+                <Option1>NewValue1</Option1>
+                <Option2>NewValue2</Option2>
+            </Settings>
+        </Config>
+    </ModuleA>
+    <ModuleB>
+        <Settings>
+            <Option1>NewValue1</Option1>
+            <Option2>NewValue2</Option2>
+        </Settings>
+    </ModuleB>
+</Root>
 
 
 ---
 
 How It Works:
 
-1. Takes the <Settings> XML as input.
+1. Reads the XML file and finds all <Settings> nodes at any depth.
 
 
-2. Parses it and finds only the subchild elements inside <Settings>.
-
-
-3. Updates only the specified tags (Option1, Option2 in this example).
-
-
-4. Outputs the modified XML while keeping other subchild elements untouched.
-
-
-
-Let me know if you need any modifications!
+2. 
 
